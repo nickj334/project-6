@@ -1,72 +1,45 @@
-# UOCIS322 - Project 6 #
-Brevet time calculator with MongoDB, and a RESTful API!
+Author: Nickolas Johnson - njohnso3@uoregon.edu
 
-Read about MongoEngine and Flask-RESTful before you start: [http://docs.mongoengine.org/](http://docs.mongoengine.org/), [https://flask-restful.readthedocs.io/en/latest/](https://flask-restful.readthedocs.io/en/latest/).
+APPLICATION
 
-## Before you begin
-You *HAVE TO* copy `.env-example` into `.env` and specify your container port numbers there!
-Note that the default values (5000 and 5000) will work!
+This application determines control open and close times for a brevet. A brevet is a timed, long distance road cycling event. To control the speed that riders are riding the
+course, there are 'controls' (similar to checkpoints) that have certain times that they open or close depending on a universal minimum and maximum speed allowed during certain
+intervals of a race. The intervals are listed below, along with their minimum and maximum speeds allowed within the given interval, all in Km/Hr:
 
-*DO NOT PLACE LOCAL PORTS IN YOUR COMPOSE FILE!*
+	0 - 200: Max speed: 34, Min speed: 15
+	200 - 400: Max speed: 32, Min speed: 15
+	400 - 600: Max speed: 30, Min speed: 15
+	600 - 1000: Max speed: 28, Min speed: 11.428
+	1000 - 1300: Max speed: 26, Min speed: 13.333
 
-## Overview
+ALGORITHM
 
-You will reuse your code from Project 5, which already has two services:
+The algorithm for this is fairly simple and contains a few special edge cases. In order to account for different minimum and maximum speeds in each distance span, I created
+a couple of dictionaries containing information for each distance span. Then I looped through each distance span individually and had two cases to check. For case 1, if the
+control point is within the distance span, then I find the amount of time it takes to get to the control point from the beginning(calculating with min/max speed depending on if 
+I am in open time or close time function). Or case 2 where it is not within the distance span. Here I get the length of the distance span divided by min/max speed, multiplied
+by 60. This will give me the minutes that it takes to cover the distance span at min/max speed. These two cases are run through for each distance span and eventually you add all
+the minutes up to get the total minute displacement from the start time and return this value.
 
-* Brevets
-	* The entire web service
-* MongoDB
 
-For this project, you will re-organize `Brevets` into two separate services:
+USING START
 
-* Web (Front-end)
-	* Time calculator (basically everything you had in project 4)
-* API (Back-end)
-	* A RESTful service to expose/store structured data in MongoDB.
+First you need to download Docker. You then can clone this repository and type "Docker build -t myimagename ." Note the '.' at the end of the commang. To run the the 
+image in a container, type "docker run -p5000:5000 myimage". Your application is now running. View your web app by going to http://localhost:5000 in a browser.
+If you're running an apple computer, then you may want to run with -p5001:5000 as port 5000 is usually used for other programs. Then you can provide the given inputs 
+specified in the webpage and it should give you open and close times.  
 
-## Tasks
 
-* Implement a RESTful API in `api/`:
-	* Write a data schema using MongoEngine for Checkpoints and Brevets:
-		* `Checkpoint`:
-			* `distance`: float, required, (checkpoint distance in kilometers), 
-			* `location`: string, optional, (checkpoint location name), 
-			* `open_time`: datetime, required, (checkpoint opening time), 
-			* `close_time`: datetime, required, (checkpoint closing time).
-		* `Brevet`:
-			* `length`: float, required, (brevet distance in kilometers),
-			* `start_time`: datetime, required, (brevet start time),
-			* `checkpoints`: list of `Checkpoint`s, required, (checkpoints).
-	* Using the schema, build a RESTful API with the resource `/brevets/`:
-		* GET `http://API:PORT/api/brevets` should display all brevets stored in the database.
-		* GET `http://API:PORT/api/brevet/ID` should display brevet with id `ID`.
-		* POST `http://API:PORT/api/brevets` should insert brevet object in request into the database.
-		* DELETE `http://API:PORT/api/brevet/ID` should delete brevet with id `ID`.
-		* PUT `http://API:PORT/api/brevet/ID` should update brevet with id `ID` with object in request.
+SUBMIT/DISPLAY
 
-* Copy over `brevets/` from your completed project 5.
-	* Replace every database related code in `brevets/` with calls to the new API.
-		* Remember: AutoGrader will ensure there is NO CONNECTION between `brevets` and `db` services. `brevets` should only operate through `api` and still function the way it did in project 5.
-		* Hint: Submit should send a POST request to the API to insert, Display should send a GET request, and display the last entry.
-	* Remove `config.py` and adjust `flask_brevets.py` to use the `PORT` and `DEBUG` values specified in env variables (see `docker-compose.yml`).
+These two buttons at the bottom of the site will insert/fetch the data provided within the rows. The submit button, when pressed, will take the degin date, brevet distance, 
+and each value within the rows: mile length, kilometer length, location, open time, and close time. Once grabbed it will insert it into the mongodb database.
+After this it will clear all values in the website to their default state. The Display button will grab the most recent insertion into the database and will change
+all values within the site to the values grabbed from insertion ("Submit"). 
 
-* Update README.md with API documentation added.
 
-As always you'll turn in your `credentials.ini` through Canvas.
+API IMPLEMENTATION
 
-## Grading Rubric
+Resources Include: api/brevet & api/brevets
 
-* If your code works as expected: 100 points. This includes:
-    * API routes as outlined above function exactly the way expected,
-    * Web application works as expected in project 5,
-    * README is updated with the necessary details.
-
-* If the front-end service does not work, 20 points will be docked.
-
-* For each of the 5 requests that do not work, 15 points will be docked.
-
-* If none of the above work, 5 points will be assigned assuming project builds and runs, and `README` is updated. Otherwise, 0 will be assigned.
-
-## Authors
-
-Michal Young, Ram Durairajan. Updated by Ali Hassani.
+Each resource had individual operations for multiple common HTTP requests. Brevet contained GET, PUT, and DELETE while Brevets contained GET and POST.
