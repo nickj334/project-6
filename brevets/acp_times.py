@@ -42,7 +42,7 @@ def open_time(control_dist_km, brevet_dist_km, brevet_start_time):
         # if control gate is further than the end of the race, set it equal to brevet distance
         control_dist_km = int(brevet_dist_km)
 
-    control_open_time = brevet_start_time
+    control_open_time = arrow.get(brevet_start_time)
     minute_shift = 0
     
     for dist_span in dist_spans:
@@ -78,6 +78,8 @@ def close_time(control_dist_km, brevet_dist_km, brevet_start_time):
        An arrow object indicating the control close time.
        This will be in the same time zone as the brevet start time.
     """
+
+    brevet_start_time = arrow.get(brevet_start_time)
     # check for special cases
     if control_dist_km < 0:
         raise ValueError

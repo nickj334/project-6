@@ -3,7 +3,6 @@ Resource: Brevet
 """
 from flask import Response, request
 from flask_restful import Resource
-from mongoengine.errors import DoesNotExist, ValidationError
 
 # You need to implement this in database/models.py
 from database.models import Brevet
@@ -29,26 +28,16 @@ from database.models import Brevet
 # directly instead of letting Flask-RESTful attempt to convert it to a
 # JSON for you.
 
-
 class Brevet(Resource):
     def get(self, id):
-        '''
-        Grab a single brevet from the database
-        '''
-        try:
-            brevet = Brevet.objects.get(id=id).to_json()
-            return Response(brevet, mimetype="application/json", status=200)
-        except DoesNotExist:
-            return {"Error": "No brevet found for id {}.".format(id)}
+        brevet = Brevet.objects.get(id=id).to_json()
+        return Response(brevet, mimetype="application/json", status=200)
 
     def put(self, id):
-        '''
-        Replacing a single brevet in the database
-        '''
         input_json = request.json
         Brevet.objects.get(id=id).update(**input_json)
-        return {"Success": "placed brevet into database"}, 200
+        return {"message": "Brevet updated successfully"}, 200
 
     def delete(self, id):
         Brevet.objects.get(id=id).delete()
-        return {"Success": "Deleted brevet"}, 200   
+        return {"message": "Brevet deleted successfully"}, 200

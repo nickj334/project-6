@@ -12,28 +12,6 @@ from database.models import Brevet
 # Brevet(...).save() : creates new brevet
 # Brevet.objects.get(id=...) : similar to find_one
 
-class Brevets(Resource):
-    def get(self):
-            brevets = Brevet.objects().to_json()
-            return Response(brevets, mimetype="application/json", status=200)
-
-    def post(self):
-        data = request.get_json()
-        brevet = Brevet(**data)
-        brevet.save()
-        return {"message": "Brevet created successfully"}, 201
-
-
-
-
-
-
-
-
-
-
-
-
 # Two options when returning responses:
 #
 # return Response(json_object, mimetype="application/json", status=200)
@@ -49,3 +27,16 @@ class Brevets(Resource):
 # it from a MongoEngine query object to a JSON and send back the JSON
 # directly instead of letting Flask-RESTful attempt to convert it to a
 # JSON for you.
+
+class Brevets(Resource):
+    def get(self):
+        brevets = Brevet.objects().to_json()
+        return Response(brevets, mimetype="application/json", status=200)
+
+    def post(self):
+        input_json = request.json
+        brevet = Brevet(**input_json).save()
+        return {'_id': str(brevet.id)}, 200
+
+
+

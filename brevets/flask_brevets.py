@@ -1,35 +1,63 @@
 """
 Replacement for RUSA ACP brevet time calculator
 (see https://rusa.org/octime_acp.html)
-
 """
 
-import os
 import flask
 from flask import request
 import arrow  # Replacement for datetime, based on moment.js
 import acp_times  # Brevet time calculations
-import config
 
 import logging
-from pymongo import MongoClient
+import os
+import requests  # The library we use to send requests to the API
 
-###
-# Globals
-###
+# Set up Flask app
 app = flask.Flask(__name__)
-CONFIG = config.configuration()
+app.debug = True if "DEBUG" not in os.environ else os.environ["DEBUG"]
+port_num = True if "PORT" not in os.environ else os.environ["PORT"]
+app.logger.setLevel(logging.DEBUG)
 
-# set up mongo client
-#client = MongoClient('mongodb://' + os.environ['MONGODB_HOSTNAME'], 27017)
+##################################################
+################### API Callers ##################
+##################################################
 
-# Use database "control_sets"
-#db = client.control_sets
-# Using collection "lists" in database
-#collection = db.lists
-###
-# Pages
-###
+API_ADDR = os.environ["API_ADDR"]
+API_PORT = os.environ["API_PORT"]
+API_URL = f"http://{API_ADDR}:{API_PORT}/api/"
+
+
+def get_brevet():
+    """
+    Obtains the newest document in the "lists" collection in the database
+    by calling the RESTful API.
+
+    Returns title (string) and items (list of dictionaries) as a tuple.
+    """
+    # Get documents (rows) in our collection (table),
+    # Sort by primary key in descending order and limit to 1 document (row)
+    # This will translate into finding the newest inserted document.
+
+    lists = requests.get(f"{API_URL}brevets").json()
+
+    # lists should be a list of dictionaries.
+    # we just need the last one:
+    brevet = lists[-1]
+    return brevet["items"], brevet["start_time"], brevet["brevet_dist_km"]
+
+
+def insert_brevet(items, start_time, brevet_dist_km):
+    """
+    Inserts a new brevet into the database by calling the API.
+
+    Inputs a title (string) and items (list of dictionaries)
+    """
+    _id = requests.post(f"{API_URL}brevets", json={"items": items, "start_time": start_time, "brevet_dist_km": brevet_dist_km}).json()
+    return _id
+
+##################################################
+################## Flask routes ##################
+##################################################
 
 
 @app.route("/")
@@ -44,136 +72,94 @@ def page_not_found(error):
     app.logger.debug("Page not found")
     return flask.render_template('404.html'), 404
 
-
 ###############
 #
 # AJAX request handlers
 #   These return JSON, rather than rendering pages.
 #
 ###############
+
+
 @app.route("/_calc_times")
 def _calc_times():
     """
     Calculates open/close times from miles, using rules
     described at https://rusa.org/octime_alg.html.
-    Expects one URL-encoded argument, the number of miles.
     """
     app.logger.debug("Got a JSON request")
-    
-    km = request.args.get('km', 999, type=float)
-    start_time = request.args.get("start_time", type=str)
-    brevet_dist_km = request.args.get("brevet_dist_km", type=int)
+    km = request.args.get('km', None, type=float)
+    brevet_dist_km = request.args.get('brevet_dist_km', None, type=float)
+    start_time = request.args.get('start_time', arrow.now().isoformat)
 
-    # app.logger.debug("request.args: {}".format(request.args))
-
-    open_time = acp_times.open_time(km, brevet_dist_km, arrow.get(start_time, 'YYYY-MM-DDTHH:mm'))
-    close_time = acp_times.close_time(km, brevet_dist_km, arrow.get(start_time, 'YYYY-MM-DDTHH:mm'))
-   
-    open_time_str = open_time.format('YYYY-MM-DDTHH:mm')
-    close_time_str = close_time.format('YYYY-MM-DDTHH:mm')
-    result = {"open": open_time_str, "close": close_time_str}
+    open_time = acp_times.open_time(km, brevet_dist_km, start_time).format('YYYY-MM-DDTHH:mm')
+    close_time = acp_times.close_time(km, brevet_dist_km, start_time).format('YYYY-MM-DDTHH:mm')
+    result = {"open": open_time, "close": close_time}
     return flask.jsonify(result=result)
 
 
-def get_rows():
-    """ 
-    Obtains the newest document in the "lists" (control_sets) collection in database "idk"
-
-    Returns begin_time, brevet_dist, and rows in a tuple
+@app.route("/insert", methods=["POST"])
+def insert():
     """
-    control_sets = collection.find().sort("_id", -1).limit(1)
+    /insert : inserts a brevet into the database.
 
-    for controls in control_sets:
+    Accepts POST requests ONLY!
 
-        return controls['begin_time'], controls['brevet_dist'], controls['rows']
-
-
-
-
-
-
-def insert_rows(begin_time, brevet_dist, rows):
-    '''
-    inserts a new list of rows into database "control_sets", stores into the collection "lists"
-
-    Inputs the begin_time (string), brevet_dist (string), rows(list of dictionaries)
-
-    Returns the unique ID assigned to the document by mongo (primary key)
-    '''
-
-    output = collection.insert_one({
-        "begin_time": begin_time,
-        "brevet_dist": brevet_dist,
-        "rows": rows
-    })
-    
-    app.logger.debug('insert id is: ', output.inserted_id)
-    _id = output.inserted_id # This is the primary key mongo assigns to the inserted document
-    return str(_id)
-
-
-@app.route("/_submit", methods=["POST"])
-def _submit():
-    '''
-    Will deal with collaboration with MongoDB to store the values from each row 
-    on webpage.
-    '''
-    try: 
-        # Read the entire body of request as JSON
-        # This will fail if the request body is not a JSON
-        # app.logger.debug('input_json is: ', flask.request.json)
-        input_json = flask.request.json
-        app.logger.debug('input_json is: ', input_json)
-        # If successful, this is now in dictionary format 
-        begin_time = input_json["begin_time"]
-        brevet_dist = input_json["brevet_dist"]
-        rows = input_json["rows"]
-        
-        insert_id = insert_rows(begin_time, brevet_dist, rows)
-
-        return flask.jsonify( result = {},
-                            message = "Inserted!",
-                            status = 1,
-                            mongo_id=insert_id)
-    except:
-        return flask.jsonify( result = {},
-                            message = "Oh no! Server Error",
-                            status = 0,
-                            mongo_id='None')
-
-    return
-
-@app.route("/_display")
-def _display():
-    '''
-    Will retrieve most recent save from submit and display it back into webpage. 
-    This save will contain previous values put into the rows on webpage
-
-    Accepts GET requests only
-
-    JSON interface: gets json, responds with json
-    '''
+    JSON interface: gets JSON, responds with JSON
+    """
     try:
-        begin_time, brevet_dist, rows = get_rows()
+        # Read the entire request body as a JSON
+        # This will fail if the request body is NOT a JSON.
+        input_json = request.json
+        # if successful, input_json is automatically parsed into a python dictionary
+        items = input_json["items"]
+        start_time = input_json["start_time"]
+        brevet_dist_km = input_json["brevet_dist_km"]
+
+        brevet_id = insert_brevet(items, start_time, brevet_dist_km)
+        app.logger.debug(brevet_id)
+
+        return flask.jsonify(result={},
+                             message="Inserted!",
+                             status=1,  # This is defined by you. You just read this value in your javascript.
+                             mongo_id=brevet_id)
+    except:
+        # Ensure Flask responds with a JSON.
+        return flask.jsonify(result={},
+                             message="Oh no! Server error!",
+                             status=0,
+                             mongo_id='None')
+
+
+@app.route("/fetch")
+def fetch():
+    """
+    /fetch : fetches the newest to-do list from the database.
+
+    Accepts GET requests ONLY!
+
+    JSON interface: gets JSON, responds with JSON
+    """
+    try:
+        items, start_time, brevet_dist_km = get_brevet()
         return flask.jsonify(
-                result = { "begin_time": begin_time, "brevet_dist": brevet_dist, "rows": rows },
-                status = 1,
-                message = "Successfully fetched controls!"
-                )
+            result={"items": items, "start_time": start_time, "brevet_dist_km": brevet_dist_km},
+            status=1,
+            message="Successfully fetched brevet!")
     except:
         return flask.jsonify(
-                result = {},
-                status = 0,
-                message = "Something went wrong, couldnt fetch controls"
-                )
+            result={},
+            status=0,
+            message="Something went wrong, couldn't fetch any brevets!")
 
-    return
-#############
 
-app.debug = CONFIG.DEBUG
-if app.debug:
-    app.logger.setLevel(logging.DEBUG)
+##################################################
+################# Start Flask App ################
+##################################################
 
 if __name__ == "__main__":
-    print("Opening for global access on port {}".format(CONFIG.PORT))
-    app.run(port=CONFIG.PORT, host="0.0.0.0")
+    app.run(port=port_num, host="0.0.0.0")
+
+
+
+
+

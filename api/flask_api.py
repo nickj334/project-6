@@ -6,8 +6,6 @@ from flask import Flask
 from flask_restful import Api
 from mongoengine import connect
 
-# You need to implement two resources: Brevet and Brevets.
-# Uncomment when done:
 from resources.brevet import Brevet
 from resources.brevets import Brevets
 
@@ -19,14 +17,12 @@ app = Flask(__name__)
 api = Api(app)
 
 # Bind resources to paths here:
-api.add_resource(Brevet, '/api/brevet/<int:brevet_id>')
+api.add_resource(Brevet, '/api/brevet/<brevet_id>')
 api.add_resource(Brevets, '/api/brevets')
 
-####################
+#############
 
 if __name__ == "__main__":
-    # Run flask app normally
-    # Read DEBUG and PORT from environment variable.
     app.debug = os.environ.get('DEBUG')
     if app.debug:
         app.logger.setLevel(logging.DEBUG)

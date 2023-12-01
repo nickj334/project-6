@@ -64,7 +64,7 @@
                <!-- columns 1 to 4  -->
                <div class="col-md-6">
                   <label>Begins at</label>
-                  <input type="datetime-local" name="begin_date" id="begin_date" />
+                  <input type="datetime-local" name="begin_date" id="begin_date" value="2021-01-01T00:00" />
                </div>
                <!-- columns 5 to 10 -->
             </div>
@@ -74,6 +74,11 @@
                appropriate for something that really is a table, like this
                one.  We allocate it the full 12 columns of the bootstrap grid.
                -->
+            <!-- Adding 'Submit' and 'Display' Buttons-->
+            <div class="col-md-6">
+               <button id="insert">Submit</button>
+               <button id="fetch">Display</button>
+           </div>
             <div class="row">
                <div class="col-md-12">
                   <table class="control_time_table">
@@ -83,7 +88,7 @@
                         <th>Location</th>
                         <th>Open</th>
                         <th>Close</th>
-			<th>Notes</th>
+                        <th>Notes</th>
                      </tr>
                      {% for row in range(20) %}
                      <tr class="control">
@@ -111,27 +116,20 @@
             </div>
             <!-- row -->
          </form>
-	<div class="row">
-		<button id="submit"> Submit </button>
-		<button id="display"> Display </button>
-	</div>
          <script type="text/javascript">
             var SCRIPT_ROOT = {{ request.script_root|tojson|safe }} ;
             var TIME_CALC_URL = SCRIPT_ROOT + "/_calc_times";
-	    var SUBMIT_URL = SCRIPT_ROOT + "/_submit";
-	    var DISPLAY_URL = SCRIPT_ROOT + "/_display";
-
+            var GET_URL = SCRIPT_ROOT + "/fetch";
+            var SAVE_URL = SCRIPT_ROOT + "/insert";
 
             function calc_times(control) {
               var km = control.find("input[name='km']").val();
+              var miles = control.find("input[name='miles']").val();
               var open_time_field = control.find("input[name='open']");
               var close_time_field = control.find("input[name='close']");
-	     
-	      // Added variable to grab start time and brevet distance
-	      var start_time = $('#begin_date').val();
-	      var brevet_dist_km = $('#brevet_dist_km').val();
-	    
-		
+	           var start_time = $("#begin_date").val();
+	           var brevet_dist_km = $("#brevet_dist_km").val();
+	      
               $.getJSON(TIME_CALC_URL, {km: km, start_time: start_time, brevet_dist_km: brevet_dist_km}).done(
                 function(data) {
                    var times = data.result;
@@ -139,7 +137,6 @@
                    console.log("Response.open = " + times.open);
                    // This part will automatically fill the open and close slots,
                    // so don't worry about those.
-
                    open_time_field.val(moment(times.open).format("YYYY-MM-DDTHH:mm"));
                    close_time_field.val(moment(times.close).format("YYYY-MM-DDTHH:mm"));
                  }
@@ -152,6 +149,11 @@
 
             $(document).ready(function(){
              // Do the following when the page is finished loading
+
+               $('.control').on('input', function() {
+                  var control = $(this);
+                  calc_times(control);
+               });
 
                 $('input[name="miles"]').change(
                    function() {
@@ -176,152 +178,161 @@
                        // Then calculate times for this entry
                        calc_times(control_entry);
                     });
-
             
-	  
-	 $('#submit').click(
-		function(event) {
-			event.preventDefault();
+               
+               // Insert event
+               $('#insert').click(
+                    function(event) {
+                        event.preventDefault();
+                        // Referencing by tag type (input) and attribute (name)
+                        // Notice the difference between this and referencing by class (.)
+                        // and referencing by id (#).
+                        var start_time = $("#begin_date").val();
+                        var brevet_dist_km = $("#brevet_dist_km").val();
 
-				// Empty list that will be updated with users control distance inputs
-				var rows = [];
-				
-				// Getting the start time and distance of brevet
-				var begin_time = $('#begin_date').val();
-				var brevet_dist = $('#brevet_dist_km').val();
-				
-				// Clearing/Resetting stert time and brevet distance
-				$('#begin_date').val('');
-				$('#brevet_dist_km').val('200');
+                        // Empty array of list items that we will fill with a for loop
+                        var items = [];
 
-				// Running through each row within table; rows hold the control points
-				$(".control").each(function() {
-					// Defining row object
-					var control_row = $(this);
-					
-					// getting variables from selected row
-					var miles = control_row.find("input[name='miles']").val();
-					var km = control_row.find("input[name='km']").val();
-					var locale = control_row.find("input[name='location']").val();
-					var open = control_row.find("input[name='open']").val();
-					var close = control_row.find("input[name='close']").val();
+                        $('.control').each(function() {
+                           // Find the row object
+                           var item = $(this);
+                            // In this row, find info
+                           var open_time = item.find("input[name='open']").val();
+                           var close_time = item.find("input[name='close']").val();
+                           var km = item.find("input[name='km']").val();
+                           var miles = item.find("input[name='miles']").val();
+                           var location = item.find("input[name='location']").val();
+                           // If not empty, append to our list.
+                           if (km) {
+                                // Construct a dictionary
+                                item_json = {
+                                    "km": km, 
+                                    "miles": miles,
+                                    "location": location,
+                                    "open_time": open_time,
+                                    "close_time": close_time
+                                }
+                                // Push to list
+                                items.push(item_json);
+                             
+                  
+                            //clear data
+                           item.find("input[name='km']").val('');
+                           item.find('input[name="miles"]').val('');
+                           item.find("input[name='open']").val('');
+                           item.find("input[name='close']").val('');
+                           item.find("input[name='location']").val('');
+                           $("#begin_date").val('');
+	                        $("#brevet_dist_km").val('');
+                           }
+                        });
 
-					// if row is not empty, add to the list
-					if (km) {
-						row_json = {
-							"miles": miles,
-							"km": km,
-							"locale": locale,
-							"open": open,
-							"close": close
-						}
-						rows.push(row_json);
-					} // end of if(km)
+                        try {
+                              if (items.length == 0) {
+                                 throw new Error("Sumbit Failed: No control times inputed");
+                              } 
+                           } catch (error){
+                              console.error(error)
+                           }
 
-					// Now clearing inputs from selected row
-					control_row.find("input[name='miles']").val('');
-					control_row.find("input[name='km']").val('');
-					control_row.find("input[name='location']").val('');
-					control_row.find("input[name='open']").val('');
-					control_row.find("input[name='close']").val('');
+                        console.log(items);
 
-				}); // end of $(".control").each
-				
-				// Error checking; if any conditions are true, var 'failed' changes to true and
-				// stops database insertion
-				var failed = false
-				if (rows.length == 0) {
-					alert('No Controls inputted!');
-					failed = true
-				}
+                        // Construct the data we will be sending Flask
+                        var new_brevet = {
+                            "start_time": start_time, 
+                            "brevet_dist_km": brevet_dist_km,
+                            "items": items};
 
-				// Create the data to send to flask
-				var controls = {
-					"begin_time": begin_time,
-					"brevet_dist": brevet_dist,
-					"rows": rows
-				};
-				// Here we have all of the information the user inputted
-				// We can now send a POST request so that it can be stored
-				// in the database
-				if (!failed) {
-					$.ajax({
-						// expect json responses from backend
-						dataType: 'json',
-						// Specify we are sending JSON
-						contentType: "application/json",
-						// Request method: POST
-						type: 'POST',
-						// URL
-						url: SUBMIT_URL,
-						// Converting our data into a string
-						data: JSON.stringify(controls),
-						// On a successful response from flask
-						success: function(data) {
-						// Check the status code given by flask
-							if (data.status == 1) {
-								console.log("Succesfully inserted! Response: ", data);
-							}
-							else {
-								console.log("Insertion Failed: ", data);
-							}
-					 	}, // end of success: function (data)
-						error: function(err) {
-							console.log("Error: ", err);
-						}
-					}); // end of $.ajax
-				}
+                        // Perfect! Now we have all the information that the user's entered
+                        // into the form. All we have to do is send a POST request to have
+                        // the backend store it in the database!
+                        $.ajax({
+                          // Expect JSON responses from our backend
+                          dataType: 'json', // expected output format (getJSON sets this as well)
+                          // Specify we're sending JSON as well
+                          contentType: "application/json",
+                          // Request method: POST
+                          type: 'POST',
+                          // URL: specified above
+                          url: SAVE_URL,
+                          // Important step that we didn't use to do in P4:
+                          // Convert our constructed dictionary to a JSON string!
+                          data: JSON.stringify(new_brevet),
+                          // On a successful response from flask:
+                          success: function(data) {
+                              // Check the status code we set in Flask
+                              // Recall: 1 was success, 0 was failure
+                              if (data.status == 1) {
+                                  console.log("Successfully inserted! Response: ", data);
+                              }
+                              else {
+                                  console.log("Insertion failed: ", data);
+                              }
+                           },
+                          // On error
+                          error: function(err){
+                           console.log("Error: ", err); }
+                        }); 
+                     
+                    }
+                );
 
-		}); // end of submit.click - function(event)
+                $('#fetch').click(
+               function(event) {
+                  event.preventDefault();
+                  // We use getJSON because we're sending a GET request.
+                  // getJSON is essentially running $.ajax as well, but sets the defaults for us.
+                  // So we're just using it for convenience.
+                  // Feel free to replace it with a $.ajax call like the one in #insert.
+                  $.getJSON(GET_URL).done(
+                     function(data) {
+                        console.log(data);
+                        if (data.status == 1) {
+                              console.log("Successfully fetched: ", data);
+                              var brevet_dist_km = $("select[name='distance']").val(data.result.brevet_dist_km);
+                              var start_time = $("input[name='begin_date']").val(data.result.start_time);
+                              var items = data.result.items;
+                              // We need to know how many items are in the fetched list.
+                              // Because if we have more rows, we need to delete.
+                              // If we have fewer rows, we need to add.
+                              // Again something you won't do in project 5 because you have a fixed
+                              // number of rows.
+                              var num_items = items.length; 
 
-		$('#display').click(
-			function(event) {
-				event.preventDefault();
+                           // For each row in the HTML table
+                           $('.control').each(function(index) {
+                              var litem = $(this); // This is our row
+                              // Clear existing values
+                              litem.find("input[name='open']").val('');
+                              litem.find("input[name='close']").val('');
+                              litem.find("input[name='km']").val('');
+                              litem.find("input[name='miles']").val('');
+                              litem.find("input[name='location']").val('')
+               
+                              // Check if we're already done?
+                              if (index < num_items) {
+                                 litem.find("input[name='open']").val(items[index].open_time);
+                                 litem.find("input[name='close']").val(items[index].close_time);
+                                 litem.find("input[name='km']").val(items[index].km);
+                                 litem.find("input[name='miles']").val(items[index].miles);
+                                 litem.find("input[name='location']").val(items[index].location);
+                              }
+                           });
 
-				$.getJSON(DISPLAY_URL).done(
-					function(data) {
-						console.log(data);
-						if (data.status == 1) {
-							console.log("Successfully fetched: ", data);
-							var begin_time = $('#begin_date').val(data.result.begin_time);
-							var brevet_dist = $('#brevet_dist_km').val(data.result.brevet_dist);
-							var controls = data.result.rows;
+                        }
+                        else {
+                              console.log("Fetch failed: ", data);
+                        }
+                     }
+                     ).fail(function(err){
+                     // In case you get an error...
+                     console.log("Error: ", err);
+                     });
+                    }
+                );
 
-							var num_controls = controls.length;
+            });
 
-							$(".control").each( function(index) {
-								var row = $(this); // This is one row of control
-								// clearing existing values
-								row.find("input[name='miles']").val('');
-								row.find("input[name='km']").val('');
-								row.find("input[name='location']").val('');
-								row.find("input[name='open']").val('');
-								row.find("input[name='close']").val('');
-
-								if (index < num_controls) {
-									row.find("input[name='miles']").val(data.result.rows[index].miles);
-									row.find("input[name='km']").val(data.result.rows[index].km);
-									row.find("input[name='location']").val(data.result.rows[index].locale);
-									row.find("input[name='open']").val(data.result.rows[index].open);
-		 							row.find("input[name='close']").val(data.result.rows[index].open);
-
-								}
-			
-							 }); // End of control.each
-		 					
-						}
-						else {
-							console.log("Fetch failed: ", data);
-		 				}
-							 
-				} // end of function(event)
-				).fail(function(err) {
-					console.log("Error: ", err);	
-				  });
-		 }); // End of display.click
-
-	}); // end of $(document).ready
-	
          </script>
       </div>
    </body>
